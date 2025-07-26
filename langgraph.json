@@ -1,0 +1,6 @@
+{
+  "project_name": "agentic_call_simulator",
+  "entrypoint": "my_agent.agent:AgentSimulator",
+  "entry_function": "run",
+  "description": "Two-agent AI conversation simulator with audio and transcript."
+}

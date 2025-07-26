@@ -1,0 +1,7 @@
+turns: 6
+topic: "Technology and Society"
+tone: "formal"
+voices:
+  - "male"
+  - "female"
+tts_provider: "coqui"

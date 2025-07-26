@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-call-simulator"
+version = "0.1.0"
+description = "SDK to simulate 2-person AI conversations with audio and text output using LangGraph."
+authors = [
+  { name = "SreenivasuAkella", email = "210020001@iitdh.ac.in" }
+]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+  "openai",
+  "langchain",
+  "langchain-community",
+  "langgraph",
+  "pydantic",
+  "pyyaml",
+  "soundfile",
+  "coqui-tts",
+  "gtts",
+  "python-dotenv"
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "black", "ruff"]
+
+[tool.setuptools]
+packages = ["my_agents"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.json", "*.wav"]
+

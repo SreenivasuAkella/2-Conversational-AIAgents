@@ -1,0 +1,18 @@
+-e .
+
+# Runtime dependencies
+openai
+langchain
+langchain-community
+langgraph
+pydantic
+pyyaml
+soundfile
+coqui-tts
+gtts
+python-dotenv
+
+# Dev dependencies
+pytest
+black
+ruff
