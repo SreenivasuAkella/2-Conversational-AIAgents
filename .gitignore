@@ -22,3 +22,6 @@ outputs/
 .idea/
 .vscode/
 .DS_Store
+
+# Env files
+.env

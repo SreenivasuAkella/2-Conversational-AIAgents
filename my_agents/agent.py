@@ -51,14 +51,30 @@ class AgentSimulator:
         save_text_transcript(self.state.messages)
 
     def generate_audio(self):
+        """Generate audio files for each message and merge them into a single conversation audio."""
         audio_files = []
         os.makedirs("outputs/audio", exist_ok=True)
+        
+        print("Generating audio for conversation...")
+        
         for idx, msg in enumerate(self.state.messages):
             if ":" in msg:
                 speaker, content = msg.split(":", 1)
+                # Use different voices for different agents
                 voice = self.config.voices[0 if "A" in speaker else 1]
                 path = f"outputs/audio/turn_{idx+1}.mp3"
+                
+                print(f"Generating audio for {speaker.strip()}: {content[:50]}...")
                 audio_file = generate_audio(content.strip(), voice, self.config.tts_provider, path)
                 if audio_file:
                     audio_files.append(audio_file)
-        merge_audio_clips(audio_files, "outputs/conversation.wav")
+        
+        # Merge all audio files into one conversation
+        if audio_files:
+            final_audio_path = merge_audio_clips(audio_files, "outputs/conversation.wav")
+            if final_audio_path:
+                print(f"Complete conversation audio saved to: {final_audio_path}")
+            else:
+                print("Failed to merge audio files")
+        else:
+            print("No audio files were generated successfully")

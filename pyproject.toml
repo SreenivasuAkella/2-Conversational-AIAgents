@@ -16,6 +16,7 @@ dependencies = [
   "openai",
   "langchain",
   "langchain-community",
+  "langchain-openai",
   "langgraph",
   "pydantic",
   "pyyaml",
