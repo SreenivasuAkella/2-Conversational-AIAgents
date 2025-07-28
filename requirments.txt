@@ -6,6 +6,7 @@ langchain
 langchain-community
 langchain-openai
 langgraph
+traceai-langchain
 pydantic
 pyyaml
 soundfile

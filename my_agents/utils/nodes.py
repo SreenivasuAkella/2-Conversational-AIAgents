@@ -2,6 +2,9 @@ import os
 from langchain_openai import ChatOpenAI
 from my_agents.utils.logger import logger
 from dotenv import load_dotenv
+
+FUTURE_AGI_ENABLED = True
+
 load_dotenv()
 
 # Get API key from environment
@@ -12,13 +15,82 @@ if not api_key:
 llm1 = ChatOpenAI(model="gpt-4o-mini", api_key=api_key)
 llm2 = ChatOpenAI(model="gpt-3.5-turbo", api_key=api_key)
 
+# FutureAGI Evaluation Integration
+def evaluate_with_futureagi(message: str, evaluation_type: str = "tone") -> dict:
+    """
+    Evaluate message using FutureAGI evaluation SDK if available
+    """
+    try:
+        logger.info(f"🔍 FutureAGI: Attempting to import evaluation SDK...")
+        from fi.evals import Evaluator, evaluate
+        logger.info(f"✅ FutureAGI: SDK imported successfully")
+        
+        # Get API keys from environment (support both naming conventions)
+        fi_api_key = os.getenv("FI_API_KEY") or os.getenv("FUTUREAGI_API_KEY")
+        fi_secret_key = os.getenv("FI_SECRET_KEY") or os.getenv("FUTUREAGI_SECRET_KEY")
+        
+        logger.info(f"🔑 FutureAGI: Checking API keys...")
+        logger.info(f"   API Key: {'✅ Set' if fi_api_key else '❌ Missing'}")
+        logger.info(f"   Secret Key: {'✅ Set' if fi_secret_key else '❌ Missing'}")
+        
+        if not fi_api_key or not fi_secret_key:
+            return {"success": False, "error": "API keys not configured - set FI_API_KEY and FI_SECRET_KEY (or FUTUREAGI_API_KEY and FUTUREAGI_SECRET_KEY)"}
+        
+        logger.info(f"🚀 FutureAGI: Calling evaluation API with template '{evaluation_type}'...")
+        
+        # Use Evaluator class with required model name
+        evaluator = Evaluator(
+            fi_api_key=fi_api_key,
+            fi_secret_key=fi_secret_key,
+        )
+        
+        # Try different model names if one fails
+        models_to_try = ["turing_flash"]
+        
+        for model_name in models_to_try:
+            try:
+                logger.info(f"   Trying model: {model_name}")
+                result = evaluator.evaluate(
+                    eval_templates=evaluation_type,
+                    inputs={"input": message},
+                    model_name=model_name
+                )
+                
+                # Check if we have valid results
+                if hasattr(result, 'eval_results') and result.eval_results and len(result.eval_results) > 0:
+                    logger.info(f"✅ FutureAGI: Evaluation completed successfully with {model_name}")
+                    return {
+                        "success": True,
+                        "evaluation": result.eval_results[0].output,
+                        "reason": result.eval_results[0].reason,
+                        "model": model_name
+                    }
+                else:
+                    logger.warning(f"⚠️ FutureAGI: No results from {model_name}")
+                    continue
+                    
+            except Exception as model_error:
+                logger.warning(f"⚠️ FutureAGI: Model {model_name} failed: {model_error}")
+                continue
+        
+        # If all models failed
+        return {"success": False, "error": "All model attempts failed"}
+        
+    except ImportError as e:
+        logger.info(f"⚠️ FutureAGI: Evaluation SDK not available - {e}")
+        return {"success": False, "error": "FutureAGI evaluation SDK not available - install with: pip install ai-evaluation"}
+    except Exception as e:
+        logger.info(f"❌ FutureAGI: Evaluation failed - {e}")
+        return {"success": False, "error": str(e)}
+
+
 def detect_conversation_tone(message_content, base_tone="professional"):
     """
     Dynamically detect the emotion based on conversation content using AI analysis.
-    Returns appropriate emotion descriptor based on intelligent content analysis.
+    Uses OpenAI as primary (superior) emotion detector, with FutureAGI as secondary analysis.
     """
     try:
-        # Use AI to analyze the emotional content of the message - NO predefined list
+        # PRIMARY: Use OpenAI for superior emotion detection - NO predefined list
         emotion_prompt = f"""Analyze the emotional tone and mood of this message. Think about how the speaker feels based on their words, tone, and content.
 
 Respond with ONLY a single descriptive emotion word that best captures their emotional state. Be creative and specific - don't use generic words. Think about subtle emotions and nuances.
@@ -41,9 +113,20 @@ What emotion does this speaker convey? Respond with just ONE word:"""
         # Validate that we got a reasonable emotion word
         if len(detected_emotion) > 20 or not detected_emotion.isalpha() or len(detected_emotion) < 3:
             logger.warning(f"Invalid emotion word received: '{detected_emotion}', using thoughtful as default")
-            return 'thoughtful'
-            
-        logger.info(f"AI detected emotion: {detected_emotion}")
+            detected_emotion = 'thoughtful'
+        
+        logger.info(f"🎭 OpenAI detected emotion: {detected_emotion}")
+        
+        # SECONDARY: Try FutureAGI for additional analysis (non-blocking)
+        try:
+            futureagi_result = evaluate_with_futureagi(message_content, "tone")
+            if futureagi_result.get("success"):
+                logger.info(f"📊 FutureAGI Tone Analysis: {futureagi_result['evaluation']} (Reason: {futureagi_result['reason']})")
+            else:
+                logger.info(f"⚠️ FutureAGI tone analysis not available: {futureagi_result.get('error', 'Unknown error')}")
+        except Exception as e:
+            logger.info(f"⚠️ FutureAGI tone analysis failed: {e}")
+        
         return detected_emotion
         
     except Exception as e:
@@ -71,16 +154,27 @@ def clean_agent_response(response_text):
         
    
 def agent_a_node(state):
+    """
+    Agent A conversation node with FutureAGI observability integration
+    """
+    # Session-based tracking for FutureAGI
+    session_id = state.config.get('session_id', f"session_{id(state)}")
+    conversation_id = state.config.get('conversation_id', f"conv_{state.config.get('topic', 'general').replace(' ', '_')}")
+    
+    # Log session information for observability
+    if FUTURE_AGI_ENABLED:
+        logger.info(f"🔍 FutureAGI Session: {session_id}, Conversation: {conversation_id}")
+    
     # Check if this is the first message
     is_first_message = len(state.messages) == 0
     
     if is_first_message:
         # Agent A initiates the conversation
         last_msg = f"Hello, let's discuss {state.config['topic']}."
-        logger.info(f"Agent A initiating conversation about: {state.config['topic']}")
+        logger.info(f"🎬 Agent A initiating conversation about: {state.config['topic']}")
     else:
         last_msg = state.messages[-1] if state.messages else f"Hello, let's discuss {state.config['topic']}."
-        logger.info(f"Agent A received: {last_msg}")
+        logger.info(f"📨 Agent A received: {last_msg[:100]}...")
 
     # Get agent persona for context but use emotion for display
     agent_a_persona = state.config.get('agent_a_persona', 'A professional discussant')
@@ -97,32 +191,53 @@ def agent_a_node(state):
         f"Just provide your direct response content without any prefixes."
     )
 
+    # Add observability metadata before LLM call
+    logger.info(f"🤖 Agent A generating response (Turn {state.turn + 1})")
+    
     response = llm1.invoke(prompt)
     response_text = response.content if hasattr(response, 'content') else str(response)
     
     # Clean up any agent name prefixes that might still appear
     response_text = clean_agent_response(response_text)
     
-    logger.info(f"Agent A replied: {response_text}")
+    logger.info(f"✅ Agent A replied: {response_text[:100]}...")
 
     # Detect dynamic emotion based on response content
+    logger.info(f"🎭 Detecting emotion for Agent A response...")
     detected_emotion = detect_conversation_tone(response_text, base_tone)
+    
+    # Evaluate conversation quality using FutureAGI if available
+    
     
     # Show Agent A with dynamic emotion in transcript
     speaker_label = f"Agent A ({detected_emotion})"
     state.messages.append(f"{speaker_label}: {response_text}")
     
+    # Enhanced logging for FutureAGI observability
+    logger.info(f"📊 Turn {state.turn + 1} completed:")
+    logger.info(f"   Speaker: Agent A")
+    logger.info(f"   Emotion: {detected_emotion}")
+    logger.info(f"   Message length: {len(response_text)} chars")
+    if FUTURE_AGI_ENABLED:
+        logger.info(f"   Session: {session_id}")
+    
     # Set next speaker and increment turn
     state.speaker = "agent_b"
     state.turn += 1
-    logger.info(f"Turn {state.turn} completed. Next speaker: {state.speaker}, detected emotion: {detected_emotion}")
     
     return state
 
 def agent_b_node(state):
+    """
+    Agent B conversation node with FutureAGI observability integration
+    """
+    # Session-based tracking for FutureAGI
+    session_id = state.config.get('session_id', f"session_{id(state)}")
+    conversation_id = state.config.get('conversation_id', f"conv_{state.config.get('topic', 'general').replace(' ', '_')}")
+    
     # Agent B responds to Agent A's message
     last_msg = state.messages[-1] if state.messages else "Hello"
-    logger.info(f"Agent B received: {last_msg}")
+    logger.info(f"📨 Agent B received: {last_msg[:100]}...")
 
     # Get agent persona for context but use emotion for display
     agent_b_persona = state.config.get('agent_b_persona', 'A professional respondent')
@@ -139,24 +254,37 @@ def agent_b_node(state):
         f"Just provide your direct response content without any prefixes."
     )
 
+    # Add observability metadata before LLM call
+    logger.info(f"🤖 Agent B generating response (Turn {state.turn + 1})")
+    
     response = llm2.invoke(prompt)
     response_text = response.content if hasattr(response, 'content') else str(response)
     
     # Clean up any agent name prefixes that might still appear
     response_text = clean_agent_response(response_text)
     
-    logger.info(f"Agent B replied: {response_text}")
+    logger.info(f"✅ Agent B replied: {response_text[:100]}...")
 
     # Detect dynamic emotion based on response content
+    logger.info(f"🎭 Detecting emotion for Agent B response...")
     detected_emotion = detect_conversation_tone(response_text, base_tone)
     
-    # Show Agent B with dynamic emotion in transcript
+    # Evaluate conversation quality using FutureAGI if available
+    
+    
     speaker_label = f"Agent B ({detected_emotion})"
     state.messages.append(f"{speaker_label}: {response_text}")
+    
+    # Enhanced logging for FutureAGI observability
+    logger.info(f"📊 Turn {state.turn + 1} completed:")
+    logger.info(f"   Speaker: Agent B")
+    logger.info(f"   Emotion: {detected_emotion}")
+    logger.info(f"   Message length: {len(response_text)} chars")
+    if FUTURE_AGI_ENABLED:
+        logger.info(f"   Session: {session_id}")
     
     # Set next speaker and increment turn
     state.speaker = "agent_a"
     state.turn += 1
-    logger.info(f"Turn {state.turn} completed. Next speaker: {state.speaker}, detected emotion: {detected_emotion}")
     
     return state
