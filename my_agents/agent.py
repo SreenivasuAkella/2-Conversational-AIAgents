@@ -1,68 +1,178 @@
-# File: my_agent/agent.py (MODIFIED with LangGraph end routing fix)
-
 from langgraph.graph import StateGraph
 from my_agents.state import ConversationState
 from my_agents.utils.nodes import agent_a_node, agent_b_node
-from my_agents.config import load_config
+from my_agents.config import load_config, ConversationMode
 from my_agents.transcript import save_transcript, save_text_transcript
 from my_agents.audio import generate_audio, merge_audio_clips
 import os
+from typing import List
 
 class AgentSimulator:
     def __init__(self, config_path: str):
         self.config = load_config(config_path)
         self.state = ConversationState(max_turns=self.config.turns, config=self.config.dict())
 
+        # Only set up LangGraph for unscripted conversations
+        if self.config.mode == ConversationMode.UNSCRIPTED:
+            self._setup_unscripted_conversation()
+        else:
+            self.app = None  # No graph needed for scripted conversations
+
+    def _setup_unscripted_conversation(self):
+        """Set up the LangGraph for AI-generated conversations with proper turn-taking logic."""
         builder = StateGraph(ConversationState)
         builder.add_node("agent_a", agent_a_node)
         builder.add_node("agent_b", agent_b_node)
 
+        # Agent A always starts the conversation
         builder.set_entry_point("agent_a")
 
         def router(state: ConversationState):
+            """
+            Determine who speaks next based on turn count and current speaker.
+            Rules:
+            - Agent A starts (turn 0)
+            - Agents alternate turns
+            - Conversation ends when max_turns is reached
+            """
             if state.turn >= state.max_turns:
+                print(f"Conversation ending: reached max turns ({state.max_turns})")
                 return None  # This maps to '__end__'
-            return state.speaker
+            
+            next_speaker = state.speaker
+            print(f"Turn {state.turn}: Next speaker is {next_speaker}")
+            return next_speaker
 
-        # Conditional edges now include None -> '__end__'
+        # Conditional edges with proper turn-taking
         builder.add_conditional_edges("agent_a", router, {
             "agent_b": "agent_b",
             None: "__end__"
         })
 
         builder.add_conditional_edges("agent_b", router, {
-            "agent_a": "agent_a",
+            "agent_a": "agent_a", 
             None: "__end__"
         })
 
         self.app = builder.compile()
+        print("Unscripted conversation graph initialized with turn-taking logic")
 
     def run(self):
-        final_state = self.app.invoke(self.state)
-        # Fix: Handle dict output from LangGraph and convert back to ConversationState
-        if isinstance(final_state, dict):
-            self.state = ConversationState(**final_state)
+        """Run the conversation based on the configured mode."""
+        if self.config.mode == ConversationMode.SCRIPTED:
+            return self._run_scripted_conversation()
         else:
-            self.state = final_state
+            return self._run_unscripted_conversation()
+
+    def _run_scripted_conversation(self):
+        """Run a scripted conversation using predefined messages with dynamic tone detection."""
+        print("Running scripted conversation...")
+        print(f"Topic: {self.config.topic}")
+        print(f"Base tone: {self.config.tone}")
+        print("-" * 50)
+        
+        if not self.config.scripted_messages:
+            raise ValueError("Scripted mode requires 'scripted_messages' in configuration")
+        
+        # Import tone detection function
+        from my_agents.utils.nodes import detect_conversation_tone
+        
+        # Convert scripted messages to show dynamic emotion format
+        base_tone = self.config.tone
+        formatted_messages = []
+        
+        for i, msg in enumerate(self.config.scripted_messages[:self.config.turns]):
+            if ":" in msg:
+                speaker, content = msg.split(":", 1)
+                
+                # Detect dynamic emotion based on message content
+                detected_emotion = detect_conversation_tone(content.strip(), base_tone)
+                
+                # Convert "Agent A:" to "Agent A (detected_emotion):"
+                if "Agent A" in speaker:
+                    formatted_speaker = f"Agent A ({detected_emotion})"
+                elif "Agent B" in speaker:
+                    formatted_speaker = f"Agent B ({detected_emotion})"
+                    
+                formatted_messages.append(f"{formatted_speaker}:{content}")
+                print(f"Turn {i+1}: {formatted_speaker} - detected emotion: {detected_emotion}")
+            else:
+                formatted_messages.append(msg)
+        
+        self.state.messages = formatted_messages
+        self.state.turn = len(self.state.messages)
+        
+        print(f"✅ Loaded {len(self.state.messages)} scripted messages with dynamic tone detection")
+        return self.state
+
+    def _run_unscripted_conversation(self):
+        """Run an AI-generated conversation using LangGraph with proper turn management."""
+        print("Running unscripted (AI-generated) conversation...")
+        print(f"Target turns: {self.state.max_turns}")
+        print(f"Topic: {self.config.topic}")
+        print(f"Tone: {self.config.tone}")
+        print("-" * 50)
+        
+        if not self.app:
+            raise ValueError("LangGraph not initialized for unscripted conversation")
+        
+        # Initialize conversation state
+        self.state.turn = 0
+        self.state.speaker = "agent_a"  # Agent A always starts
+        self.state.messages = []
+        
+        print("🎬 Starting conversation with Agent A...")
+        
+        try:
+            # Run the conversation through LangGraph
+            final_state = self.app.invoke(self.state)
+            
+            # Convert result back to ConversationState if it's a dict
+            if isinstance(final_state, dict):
+                self.state = ConversationState(**final_state)
+            else:
+                self.state = final_state
+                
+            print(f"✅ Conversation completed with {len(self.state.messages)} exchanges")
+            
+        except Exception as e:
+            print(f"❌ Error during conversation: {e}")
+            raise
+        
         return self.state
 
     def save_transcript(self):
-        save_transcript(self.state.messages)
-        save_text_transcript(self.state.messages)
+        """Save the conversation transcript in both JSON and text formats in mode-specific folders."""
+        # Determine the output folder based on conversation mode
+        mode_folder = f"outputs/{self.config.mode.value}"
+        
+        # Save in mode-specific folders
+        save_transcript(self.state.messages, f"{mode_folder}/transcript.json")
+        save_text_transcript(self.state.messages, f"{mode_folder}/transcript.txt")
+        
+        print(f"📄 Transcript saved to {mode_folder}/transcript.txt and {mode_folder}/transcript.json")
 
     def generate_audio(self):
-        """Generate audio files for each message and merge them into a single conversation audio."""
+        """Generate audio files for each message and merge them into a single conversation audio in mode-specific folders."""
+        # Determine the output folder based on conversation mode
+        mode_folder = f"outputs/{self.config.mode.value}"
+        audio_folder = f"{mode_folder}/audio"
+        
         audio_files = []
-        os.makedirs("outputs/audio", exist_ok=True)
+        os.makedirs(audio_folder, exist_ok=True)
         
         print("Generating audio for conversation...")
         
         for idx, msg in enumerate(self.state.messages):
             if ":" in msg:
                 speaker, content = msg.split(":", 1)
-                # Use different voices for different agents
-                voice = self.config.voices[0 if "A" in speaker else 1]
-                path = f"outputs/audio/turn_{idx+1}.mp3"
+                # Extract Agent A or Agent B from speaker label like "Agent A (persona)"
+                if "Agent A" in speaker:
+                    voice = self.config.voices[0] if len(self.config.voices) > 0 else "voice1"
+                elif "Agent B" in speaker:
+                    voice = self.config.voices[1] if len(self.config.voices) > 1 else "voice2"
+                    
+                path = f"{audio_folder}/turn_{idx+1}.mp3"
                 
                 print(f"Generating audio for {speaker.strip()}: {content[:50]}...")
                 audio_file = generate_audio(content.strip(), voice, self.config.tts_provider, path)
@@ -71,9 +181,9 @@ class AgentSimulator:
         
         # Merge all audio files into one conversation
         if audio_files:
-            final_audio_path = merge_audio_clips(audio_files, "outputs/conversation.wav")
+            final_audio_path = merge_audio_clips(audio_files, f"{mode_folder}/conversation.wav")
             if final_audio_path:
-                print(f"Complete conversation audio saved to: {final_audio_path}")
+                print(f"🎵 Complete conversation audio saved to: {final_audio_path}")
             else:
                 print("Failed to merge audio files")
         else:

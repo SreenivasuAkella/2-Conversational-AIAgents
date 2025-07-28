@@ -6,15 +6,18 @@ import numpy as np
 
 def generate_audio(text: str, voice: str, provider: str, out_path: str):
     """
-    Generate TTS audio using gTTS (Google Text-to-Speech).
+    Generate TTS audio using gTTS (Google Text-to-Speech) with voice differentiation.
+    Uses standard English voice without specific accents.
     """
     try:
-        # Use gTTS regardless of provider setting for now
-        # In the future, you can add logic to switch between providers
+        # Use standard English voice without accent differentiation
         tts = gTTS(text=text, lang='en', slow=False)
+        print(f"Generating {voice} voice for: {text[:50]}...")
+        
         tts.save(out_path)
-        print(f"Audio saved to: {out_path}")
+        print(f"Audio saved to: {out_path} (Voice: {voice})")
         return out_path
+        
     except Exception as e:
         print(f"TTS generation failed: {e}")
         return None

@@ -1,0 +1,15 @@
+turns: 4
+topic: "Artificial Intelligence Ethics"
+tone: "professional"
+mode: "scripted"
+voices:
+  - "voice1" # Agent A voice
+  - "voice2" # Agent B voice
+tts_provider: "gtts"
+
+# Predefined conversation messages
+scripted_messages:
+  - "Agent A: Good morning. I'd like to discuss the ethical implications of artificial intelligence in today's society. What are your thoughts on the responsibility of AI developers?"
+  - "Agent B: Good morning. That's a fascinating topic. I believe AI developers have a significant responsibility to ensure their systems are transparent, fair, and accountable. We must consider the potential biases in training data and algorithms."
+  - "Agent A: Absolutely. The issue of bias is particularly concerning. How do you think we can address algorithmic bias while maintaining innovation in AI development?"
+  - "Agent B: It requires a multi-faceted approach. We need diverse development teams, comprehensive testing across different demographics, and ongoing monitoring of AI systems in production. Regulation and industry standards also play a crucial role."
