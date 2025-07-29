@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agentic-call-simulator"
+name = "ai-convo-simulator"
 version = "0.1.0"
 description = "SDK to simulate 2-person AI conversations with audio and text output using LangGraph."
 authors = [
@@ -31,7 +31,7 @@ dependencies = [
 dev = ["pytest", "black", "ruff"]
 
 [tool.setuptools]
-packages = ["my_agents"]
+packages = ["agentic_sdk"]
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.json", "*.wav"]

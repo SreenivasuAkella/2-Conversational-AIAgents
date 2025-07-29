@@ -1,15 +1,43 @@
 from langgraph.graph import StateGraph
-from my_agents.state import ConversationState
-from my_agents.utils.nodes import agent_a_node, agent_b_node
-from my_agents.config import load_config, ConversationMode
-from my_agents.transcript import save_transcript, save_text_transcript
-from my_agents.audio import generate_audio, merge_audio_clips
+from agentic_sdk.state import ConversationState
+from agentic_sdk.utils.nodes import agent_a_node, agent_b_node
+from agentic_sdk.config import load_config, ConversationMode
+from agentic_sdk.transcript import save_transcript, save_text_transcript
+from agentic_sdk.audio import generate_audio, merge_audio_clips
 import os
 from typing import List
 
 class AgentSimulator:
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str = None, config: dict = None):
+        """Initialize AgentSimulator with configuration.
+        
+        Args:
+            config_path: Path to configuration file
+            config: Configuration dictionary (alternative to config_path)
+        """
+        self.config = None
+        self.state = None
+        self.app = None
+        self._observers = []  # For observability callbacks
+        
+        if config_path:
+            self.configure_from_file(config_path)
+        elif config:
+            self.configure_from_dict(config)
+    
+    def configure_from_file(self, config_path: str):
+        """Configure the simulator from a file path."""
         self.config = load_config(config_path)
+        self._initialize_state()
+        
+    def configure_from_dict(self, config: dict):
+        """Configure the simulator from a configuration dictionary."""
+        # Convert dict to config object if needed
+        self.config = config  # Assuming config object or dict handling
+        self._initialize_state()
+    
+    def _initialize_state(self):
+        """Initialize conversation state after configuration."""
         self.state = ConversationState(max_turns=self.config.turns, config=self.config.dict())
 
         # Only set up LangGraph for unscripted conversations
@@ -57,15 +85,66 @@ class AgentSimulator:
         self.app = builder.compile()
         print("Unscripted conversation graph initialized with turn-taking logic")
 
-    def run(self):
-        """Run the conversation based on the configured mode."""
-        if self.config.mode == ConversationMode.SCRIPTED:
-            return self._run_scripted_conversation()
-        else:
-            return self._run_unscripted_conversation()
+    def add_observer(self, callback):
+        """Add an observer callback for monitoring conversation progress.
+        
+        Args:
+            callback: Function that accepts (event_type, data) parameters
+        """
+        self._observers.append(callback)
+    
+    def remove_observer(self, callback):
+        """Remove an observer callback."""
+        if callback in self._observers:
+            self._observers.remove(callback)
+    
+    def _notify_observers(self, event_type: str, data: dict):
+        """Notify all observers of an event."""
+        for callback in self._observers:
+            try:
+                callback(event_type, data)
+            except Exception as e:
+                print(f"Observer callback error: {e}")
 
-    def _run_scripted_conversation(self):
+    def run(self, observe: bool = True):
+        """Run the conversation based on the configured mode.
+        
+        Args:
+            observe: Whether to emit observation events during execution
+        """
+        if not self.config:
+            raise ValueError("AgentSimulator must be configured before running")
+            
+        if observe:
+            self._notify_observers("conversation_started", {
+                "mode": self.config.mode.value,
+                "topic": self.config.topic,
+                "max_turns": self.config.turns
+            })
+        
+        try:
+            if self.config.mode == ConversationMode.SCRIPTED:
+                result = self._run_scripted_conversation(observe)
+            else:
+                result = self._run_unscripted_conversation(observe)
+                
+            if observe:
+                self._notify_observers("conversation_completed", {
+                    "total_messages": len(self.state.messages),
+                    "final_turn": self.state.turn
+                })
+                
+            return result
+        except Exception as e:
+            if observe:
+                self._notify_observers("conversation_error", {"error": str(e)})
+            raise
+
+    def _run_scripted_conversation(self, observe: bool = True):
         """Run a scripted conversation using predefined messages with dynamic tone detection."""
+        if observe:
+            self._notify_observers("scripted_mode_started", {"base_tone": self.config.tone})
+            
         print("Running scripted conversation...")
         print(f"Topic: {self.config.topic}")
         print(f"Base tone: {self.config.tone}")
@@ -75,7 +154,7 @@ class AgentSimulator:
             raise ValueError("Scripted mode requires 'scripted_messages' in configuration")
         
         # Import tone detection function
-        from my_agents.utils.nodes import detect_conversation_tone
+        from agentic_sdk.utils.nodes import detect_conversation_tone
         
         # Convert scripted messages to show dynamic emotion format
         base_tone = self.config.tone
@@ -95,6 +174,15 @@ class AgentSimulator:
                     formatted_speaker = f"Agent B ({detected_emotion})"
                     
                 formatted_messages.append(f"{formatted_speaker}:{content}")
+                
+                if observe:
+                    self._notify_observers("message_processed", {
+                        "turn": i+1,
+                        "speaker": formatted_speaker,
+                        "emotion": detected_emotion,
+                        "content_preview": content.strip()[:100]
+                    })
+                    
                 print(f"Turn {i+1}: {formatted_speaker} - detected emotion: {detected_emotion}")
             else:
                 formatted_messages.append(msg)
@@ -105,8 +193,14 @@ class AgentSimulator:
         print(f"✅ Loaded {len(self.state.messages)} scripted messages with dynamic tone detection")
         return self.state
 
-    def _run_unscripted_conversation(self):
+    def _run_unscripted_conversation(self, observe: bool = True):
         """Run an AI-generated conversation using LangGraph with proper turn management."""
+        if observe:
+            self._notify_observers("unscripted_mode_started", {
+                "target_turns": self.state.max_turns,
+                "topic": self.config.topic
+            })
+            
         print("Running unscripted (AI-generated) conversation...")
         print(f"Target turns: {self.state.max_turns}")
         print(f"Topic: {self.config.topic}")
@@ -140,6 +234,28 @@ class AgentSimulator:
             raise
         
         return self.state
+
+    def get_state(self):
+        """Get current conversation state for observation."""
+        return {
+            "messages": self.state.messages if self.state else [],
+            "turn": self.state.turn if self.state else 0,
+            "max_turns": self.state.max_turns if self.state else 0,
+            "config": self.config.dict() if self.config else {}
+        }
+    
+    def get_metrics(self):
+        """Get conversation metrics for monitoring."""
+        if not self.state:
+            return {"status": "not_initialized"}
+            
+        return {
+            "total_messages": len(self.state.messages),
+            "current_turn": self.state.turn,
+            "progress": self.state.turn / self.state.max_turns if self.state.max_turns > 0 else 0,
+            "mode": self.config.mode.value if self.config else "unknown",
+            "completed": self.state.turn >= self.state.max_turns
+        }
 
     def save_transcript(self):
         """Save the conversation transcript in both JSON and text formats in mode-specific folders."""

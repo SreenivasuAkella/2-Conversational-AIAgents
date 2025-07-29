@@ -1,6 +1,6 @@
 import os
 from langchain_openai import ChatOpenAI
-from my_agents.utils.logger import logger
+from agentic_sdk.utils.logger import logger
 from dotenv import load_dotenv
 
 FUTURE_AGI_ENABLED = True
