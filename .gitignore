@@ -11,12 +11,7 @@ build/
 env/
 venv/
 
-# Output files
-outputs/
-*.wav
-*.mp3
-*.json
-*.txt
+
 
 # Editor junk
 .idea/
