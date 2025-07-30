@@ -1,9 +1,9 @@
 from langgraph.graph import StateGraph
-from agentic_sdk.state import ConversationState
-from agentic_sdk.utils.nodes import agent_a_node, agent_b_node
-from agentic_sdk.config import load_config, ConversationMode
-from agentic_sdk.transcript import save_transcript, save_text_transcript
-from agentic_sdk.audio import generate_audio, merge_audio_clips
+from .state import ConversationState
+from .utils.nodes import agent_a_node, agent_b_node
+from .config import load_config, ConversationMode
+from .transcript import save_transcript, save_text_transcript
+from .audio import generate_audio, merge_audio_clips
 import os
 from typing import List
 
@@ -150,7 +150,7 @@ class AgentSimulator:
             raise ValueError("Scripted mode requires 'scripted_messages' in configuration")
         
         # Import tone detection function
-        from agentic_sdk.utils.nodes import detect_conversation_tone
+        from .utils.nodes import detect_conversation_tone
         
         # Convert scripted messages to show dynamic emotion format
         base_tone = self.config.tone

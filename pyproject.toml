@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-convo-simulator"
-version = "0.1.0"
+version = "0.1.1"
 description = "SDK to simulate 2-person AI conversations with audio and text output using LangGraph."
 authors = [
   { name = "SreenivasuAkella", email = "210020001@iitdh.ac.in" }
@@ -31,7 +31,10 @@ dependencies = [
 dev = ["pytest", "black", "ruff"]
 
 [tool.setuptools]
-packages = ["agentic_sdk"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.json", "*.wav"]

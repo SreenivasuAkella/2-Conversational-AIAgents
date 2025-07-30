@@ -1,6 +1,6 @@
 import os
 from langchain_openai import ChatOpenAI
-from agentic_sdk.utils.logger import logger
+from .logger import logger
 from dotenv import load_dotenv
 from fi.evals import Evaluator, evaluate
 
