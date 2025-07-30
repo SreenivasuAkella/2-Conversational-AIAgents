@@ -11,14 +11,14 @@ class ConversationConfig(BaseModel):
     turns: int
     topic: str
     tone: str
-    voices: List[str]  # e.g., ["male", "female"]
+    voices: List[str] 
     tts_provider: str
     mode: ConversationMode = ConversationMode.UNSCRIPTED  # Default to unscripted
     
-    # For scripted conversations
+    
     scripted_messages: Optional[List[str]] = None
     
-    # For unscripted conversations (AI-generated)
+    
     agent_a_persona: Optional[str] = None
     agent_b_persona: Optional[str] = None
     conversation_context: Optional[str] = None

@@ -58,7 +58,21 @@ agentic_call_simulator_sdk/
 
 ## Installation
 
-### From Source
+### 1. Create a Virtual Environment (Recommended)
+
+On Windows:
+```sh
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+On macOS/Linux:
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 2. Install from Source
 
 ```sh
 git clone https://github.com/SreenivasuAkella/2-Conversational-AIAgents.git
@@ -71,7 +85,6 @@ pip install .
 ```sh
 pip install ai-convo-simulator
 ```
-
 ---
 
 ## Environment Setup

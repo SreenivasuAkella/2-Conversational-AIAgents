@@ -10,10 +10,9 @@ from typing import List
 class AgentSimulator:
     def __init__(self, config_path: str = None, config: dict = None):
         """Initialize AgentSimulator with configuration.
-        
         Args:
             config_path: Path to configuration file
-            config: Configuration dictionary (alternative to config_path)
+            config: Configuration dictionary
         """
         self.config = None
         self.state = None
@@ -26,18 +25,15 @@ class AgentSimulator:
             self.configure_from_dict(config)
     
     def configure_from_file(self, config_path: str):
-        """Configure the simulator from a file path."""
         self.config = load_config(config_path)
         self._initialize_state()
         
     def configure_from_dict(self, config: dict):
-        """Configure the simulator from a configuration dictionary."""
-        # Convert dict to config object if needed
+        """Configure the simulator using a dictionary."""
         self.config = config  # Assuming config object or dict handling
         self._initialize_state()
     
     def _initialize_state(self):
-        """Initialize conversation state after configuration."""
         self.state = ConversationState(max_turns=self.config.turns, config=self.config.dict())
 
         # Only set up LangGraph for unscripted conversations
@@ -190,7 +186,7 @@ class AgentSimulator:
         self.state.messages = formatted_messages
         self.state.turn = len(self.state.messages)
         
-        print(f"✅ Loaded {len(self.state.messages)} scripted messages with dynamic tone detection")
+        print(f"Loaded {len(self.state.messages)} scripted messages with dynamic tone detection")
         return self.state
 
     def _run_unscripted_conversation(self, observe: bool = True):
@@ -215,7 +211,7 @@ class AgentSimulator:
         self.state.speaker = "agent_a"  # Agent A always starts
         self.state.messages = []
         
-        print("🎬 Starting conversation with Agent A...")
+        print("Starting conversation with Agent A...")
         
         try:
             # Run the conversation through LangGraph
@@ -227,10 +223,10 @@ class AgentSimulator:
             else:
                 self.state = final_state
                 
-            print(f"✅ Conversation completed with {len(self.state.messages)} exchanges")
+            print(f"Conversation completed with {len(self.state.messages)} exchanges")
             
         except Exception as e:
-            print(f"❌ Error during conversation: {e}")
+            print(f"Error during conversation: {e}")
             raise
         
         return self.state
@@ -259,14 +255,13 @@ class AgentSimulator:
 
     def save_transcript(self):
         """Save the conversation transcript in both JSON and text formats in mode-specific folders."""
-        # Determine the output folder based on conversation mode
         mode_folder = f"outputs/{self.config.mode.value}"
         
         # Save in mode-specific folders
         save_transcript(self.state.messages, f"{mode_folder}/transcript.json")
         save_text_transcript(self.state.messages, f"{mode_folder}/transcript.txt")
         
-        print(f"📄 Transcript saved to {mode_folder}/transcript.txt and {mode_folder}/transcript.json")
+        print(f"Transcript saved to {mode_folder}/transcript.txt and {mode_folder}/transcript.json")
 
     def generate_audio(self):
         """Generate audio files for each message and merge them into a single conversation audio in mode-specific folders."""
@@ -299,7 +294,7 @@ class AgentSimulator:
         if audio_files:
             final_audio_path = merge_audio_clips(audio_files, f"{mode_folder}/conversation.wav")
             if final_audio_path:
-                print(f"🎵 Complete conversation audio saved to: {final_audio_path}")
+                print(f"Complete conversation audio saved to: {final_audio_path}")
             else:
                 print("Failed to merge audio files")
         else:

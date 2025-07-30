@@ -10,15 +10,15 @@ from agentic_sdk import AgentSimulator
 def conversation_observer(event_type, data):
     """Observer callback to monitor conversation progress."""
     if event_type == "conversation_started":
-        print(f"🚀 Conversation started - Mode: {data['mode']}, Topic: {data['topic']}")
+        print(f" Conversation started - Mode: {data['mode']}, Topic: {data['topic']}")
     elif event_type == "scripted_mode_started":
-        print(f"📜 Scripted mode initialized - Base tone: {data['base_tone']}")
+        print(f"Scripted mode initialized - Base tone: {data['base_tone']}")
     elif event_type == "message_processed":
-        print(f"💬 Turn {data['turn']}: {data['speaker']} - Content: {data['content_preview'][:50]}...")
+        print(f"Turn {data['turn']}: {data['speaker']} - Content: {data['content_preview'][:50]}...")
     elif event_type == "conversation_completed":
-        print(f"✅ Conversation finished - {data['total_messages']} messages, {data['final_turn']} turns")
+        print(f"Conversation finished - {data['total_messages']} messages, {data['final_turn']} turns")
     elif event_type == "conversation_error":
-        print(f"❌ Error occurred: {data['error']}")
+        print(f"Error occurred: {data['error']}")
 
 def main():
     print("Running SCRIPTED conversation...")
@@ -35,23 +35,22 @@ def main():
     
     # Show initial state
     state = sim.get_state()
-    print(f"📊 Configuration loaded: {len(state['config'])} settings")
+    print(f"Configuration loaded: {len(state['config'])} settings")
     
     # Run the conversation with observability
     sim.run(observe=True)
     
     # Show final metrics
     final_metrics = sim.get_metrics()
-    print(f"📊 Final metrics: {final_metrics['total_messages']} messages processed")
+    print(f"Final metrics: {final_metrics['total_messages']} messages processed")
     
     # Save outputs
     sim.save_transcript()
     sim.generate_audio()
     
-    print("\n🎉 Scripted conversation completed!")
-    print("📁 Check outputs/scripted/transcript.txt for the conversation")
-    print("🎵 Check outputs/scripted/conversation.wav for the audio")
-    print("🎭 Emotions are dynamically detected based on conversation content!")
+    print("\nScripted conversation completed!")
+    print("Check outputs/scripted/transcript.txt for the conversation")
+    print("Check outputs/scripted/conversation.wav for the audio")
 
 if __name__ == "__main__":
     main()

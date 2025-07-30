@@ -2,6 +2,7 @@ import os
 from langchain_openai import ChatOpenAI
 from agentic_sdk.utils.logger import logger
 from dotenv import load_dotenv
+from fi.evals import Evaluator, evaluate
 
 FUTURE_AGI_ENABLED = True
 
@@ -22,16 +23,15 @@ def evaluate_with_futureagi(message: str, evaluation_type: str = "tone") -> dict
     """
     try:
         logger.info(f"🔍 FutureAGI: Attempting to import evaluation SDK...")
-        from fi.evals import Evaluator, evaluate
         logger.info(f" FutureAGI: SDK imported successfully")
         
         # Get API keys from environment (support both naming conventions)
         fi_api_key = os.getenv("FI_API_KEY") or os.getenv("FUTUREAGI_API_KEY")
         fi_secret_key = os.getenv("FI_SECRET_KEY") or os.getenv("FUTUREAGI_SECRET_KEY")
         
-        logger.info(f"🔑 FutureAGI: Checking API keys...")
-        logger.info(f"   API Key: {' Set' if fi_api_key else '❌ Missing'}")
-        logger.info(f"   Secret Key: {' Set' if fi_secret_key else '❌ Missing'}")
+        logger.info(f"FutureAGI: Checking API keys...")
+        logger.info(f"   API Key: {' Set' if fi_api_key else 'Missing'}")
+        logger.info(f"   Secret Key: {' Set' if fi_secret_key else ' Missing'}")
         
         if not fi_api_key or not fi_secret_key:
             return {"success": False, "error": "API keys not configured - set FI_API_KEY and FI_SECRET_KEY (or FUTUREAGI_API_KEY and FUTUREAGI_SECRET_KEY)"}
@@ -115,23 +115,19 @@ Message: "{message_content}"
 
 What emotion does this speaker convey? Respond with just ONE word:"""
         
-        # Use a lightweight model for emotion detection with simplified settings
         emotion_response = llm1.invoke(emotion_prompt)
         detected_emotion = emotion_response.content.strip().lower() if hasattr(emotion_response, 'content') else str(emotion_response).strip().lower()
         
-        # Clean up the response to ensure we get just the emotion word
         detected_emotion = detected_emotion.replace('"', '').replace("'", '').replace('.', '').strip()
         
-        # Take only the first word if multiple words returned
         if ' ' in detected_emotion:
             detected_emotion = detected_emotion.split()[0]
         
-        # Validate that we got a reasonable emotion word
         if len(detected_emotion) > 20 or not detected_emotion.isalpha() or len(detected_emotion) < 3:
             logger.warning(f"Invalid emotion word received: '{detected_emotion}', using thoughtful as default")
             detected_emotion = 'thoughtful'
         
-        logger.info(f"🎭 OpenAI detected emotion: {detected_emotion}")
+        logger.info(f" OpenAI detected emotion: {detected_emotion}")
         
         # SECONDARY: Try FutureAGI for additional analysis (non-blocking)
         try:
@@ -147,7 +143,6 @@ What emotion does this speaker convey? Respond with just ONE word:"""
         
     except Exception as e:
         logger.error(f"AI emotion detection failed: {e}")
-        # Only use simple fallback when AI completely fails
         return 'thoughtful'
 
 
@@ -157,13 +152,12 @@ def clean_agent_response(response_text):
     """
     import re
     
-    # Remove agent name prefixes at the start
+    
     response_text = re.sub(r'^Agent [AB]\s*\([^)]*\):\s*', '', response_text.strip())
     response_text = re.sub(r'^Agent [AB]:\s*', '', response_text.strip())
     response_text = re.sub(r'^Agent [AB]\s*\([^)]*\),?\s*', '', response_text.strip())
     response_text = re.sub(r'^Agent [AB],?\s*', '', response_text.strip())
     
-    # Remove any remaining agent references at start of sentences
     response_text = re.sub(r'\n\s*Agent [AB]\s*\([^)]*\):\s*', '\n', response_text)
     response_text = re.sub(r'\n\s*Agent [AB]:\s*', '\n', response_text)
     
@@ -174,30 +168,24 @@ def agent_a_node(state):
     """
     Agent A conversation node with FutureAGI observability integration
     """
-    # Session-based tracking for FutureAGI
     session_id = state.config.get('session_id', f"session_{id(state)}")
     conversation_id = state.config.get('conversation_id', f"conv_{state.config.get('topic', 'general').replace(' ', '_')}")
     
-    # Log session information for observability
     if FUTURE_AGI_ENABLED:
         logger.info(f" FutureAGI Session: {session_id}, Conversation: {conversation_id}")
     
-    # Check if this is the first message
     is_first_message = len(state.messages) == 0
     
     if is_first_message:
-        # Agent A initiates the conversation
         last_msg = f"Hello, let's discuss {state.config['topic']}."
         logger.info(f" Agent A initiating conversation about: {state.config['topic']}")
     else:
         last_msg = state.messages[-1] if state.messages else f"Hello, let's discuss {state.config['topic']}."
         logger.info(f" Agent A received: {last_msg[:100]}...")
 
-    # Get agent persona for context but use emotion for display
     agent_a_persona = state.config.get('agent_a_persona', 'A professional discussant')
     base_tone = state.config.get('tone', 'neutral')
     
-    # Include conversation context and topic in the prompt - IMPORTANT: Don't include agent name in response
     prompt = (
         f"You are {agent_a_persona}. "
         f"Speak in a {base_tone} tone. "
@@ -208,45 +196,37 @@ def agent_a_node(state):
         f"Just provide your direct response content without any prefixes."
     )
 
-    # Add observability metadata before LLM call
     logger.info(f" Agent A generating response (Turn {state.turn + 1})")
     
     response = llm1.invoke(prompt)
     response_text = response.content if hasattr(response, 'content') else str(response)
     
-    # Clean up any agent name prefixes that might still appear
     response_text = clean_agent_response(response_text)
     
     logger.info(f" Agent A replied: {response_text[:100]}...")
 
-    # Detect dynamic emotion based on response content
     logger.info(f"Detecting emotion for Agent A response...")
     detected_emotion = detect_conversation_tone(response_text, base_tone)
     
     # Evaluate conversation quality using FutureAGI if available
     if not is_first_message:
-        # FutureAGI Conversation Coherence Evaluation
         coherence_result = evaluate_with_futureagi(response_text, "coherence")
         if coherence_result.get("success"):
             logger.info(f" FutureAGI Coherence: {coherence_result['evaluation']} (Reason: {coherence_result['reason']})")
         else:
             logger.info(f" FutureAGI coherence evaluation failed: {coherence_result.get('error', 'Unknown error')}")
         
-        # FutureAGI Conversation Resolution Evaluation (check if conversation is reaching resolution)
         resolution_result = evaluate_with_futureagi(response_text, "resolution")
         if resolution_result.get("success"):
             logger.info(f"FutureAGI Resolution: {resolution_result['evaluation']} (Reason: {resolution_result['reason']})")
         else:
             logger.info(f"FutureAGI resolution evaluation failed: {resolution_result.get('error', 'Unknown error')}")
         
-        # Analyze overall conversation context (every few turns)
         
     
-    # Show Agent A with dynamic emotion in transcript
     speaker_label = f"Agent A ({detected_emotion})"
     state.messages.append(f"{speaker_label}: {response_text}")
     
-    # Enhanced logging for FutureAGI observability
     logger.info(f" Turn {state.turn + 1} completed:")
     logger.info(f"   Speaker: Agent A")
     logger.info(f"   Emotion: {detected_emotion}")
@@ -254,7 +234,6 @@ def agent_a_node(state):
     if FUTURE_AGI_ENABLED:
         logger.info(f"   Session: {session_id}")
     
-    # Set next speaker and increment turn
     state.speaker = "agent_b"
     state.turn += 1
     
@@ -264,19 +243,15 @@ def agent_b_node(state):
     """
     Agent B conversation node with FutureAGI observability integration
     """
-    # Session-based tracking for FutureAGI
     session_id = state.config.get('session_id', f"session_{id(state)}")
     conversation_id = state.config.get('conversation_id', f"conv_{state.config.get('topic', 'general').replace(' ', '_')}")
     
-    # Agent B responds to Agent A's message
     last_msg = state.messages[-1] if state.messages else "Hello"
     logger.info(f" Agent B received: {last_msg[:100]}...")
 
-    # Get agent persona for context but use emotion for display
     agent_b_persona = state.config.get('agent_b_persona', 'A professional respondent')
     base_tone = state.config.get('tone', 'neutral')
     
-    # Include conversation context and topic in the prompt - IMPORTANT: Don't include agent name in response
     prompt = (
         f"You are {agent_b_persona}. "
         f"Speak in a {base_tone} tone. "
@@ -287,37 +262,30 @@ def agent_b_node(state):
         f"Just provide your direct response content without any prefixes."
     )
 
-    # Add observability metadata before LLM call
     logger.info(f" Agent B generating response (Turn {state.turn + 1})")
     
     response = llm2.invoke(prompt)
     response_text = response.content if hasattr(response, 'content') else str(response)
     
-    # Clean up any agent name prefixes that might still appear
     response_text = clean_agent_response(response_text)
     
     logger.info(f" Agent B replied: {response_text[:100]}...")
 
-    # Detect dynamic emotion based on response content
     logger.info(f"Detecting emotion for Agent B response...")
     detected_emotion = detect_conversation_tone(response_text, base_tone)
     
-    # Evaluate conversation quality using FutureAGI if available
-    # FutureAGI Conversation Coherence Evaluation
     coherence_result = evaluate_with_futureagi(response_text, "coherence")
     if coherence_result.get("success"):
         logger.info(f" FutureAGI Coherence: {coherence_result['evaluation']} (Reason: {coherence_result['reason']})")
     else:
         logger.info(f" FutureAGI coherence evaluation failed: {coherence_result.get('error', 'Unknown error')}")
     
-    # FutureAGI Conversation Resolution Evaluation (check if conversation is reaching resolution)
     resolution_result = evaluate_with_futureagi(response_text, "resolution")
     if resolution_result.get("success"):
         logger.info(f" FutureAGI Resolution: {resolution_result['evaluation']} (Reason: {resolution_result['reason']})")
     else:
         logger.info(f" FutureAGI resolution evaluation failed: {resolution_result.get('error', 'Unknown error')}")
     
-    # Show Agent B with dynamic emotion in transcript
     speaker_label = f"Agent B ({detected_emotion})"
     state.messages.append(f"{speaker_label}: {response_text}")
     
@@ -329,7 +297,6 @@ def agent_b_node(state):
     if FUTURE_AGI_ENABLED:
         logger.info(f"   Session: {session_id}")
     
-    # Set next speaker and increment turn
     state.speaker = "agent_a"
     state.turn += 1
     

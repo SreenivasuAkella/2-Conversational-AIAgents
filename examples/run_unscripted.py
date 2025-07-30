@@ -10,15 +10,15 @@ from agentic_sdk import AgentSimulator
 def conversation_observer(event_type, data):
     """Observer callback to monitor conversation progress."""
     if event_type == "conversation_started":
-        print(f"🚀 Conversation started - Mode: {data['mode']}, Topic: {data['topic']}")
+        print(f" Conversation started - Mode: {data['mode']}, Topic: {data['topic']}")
     elif event_type == "unscripted_mode_started":
-        print(f"🤖 AI mode initialized - Target turns: {data['target_turns']}")
+        print(f" AI mode initialized - Target turns: {data['target_turns']}")
     elif event_type == "message_processed":
-        print(f"💬 Turn {data['turn']}: {data['speaker']} ({data['emotion']})")
+        print(f" Turn {data['turn']}: {data['speaker']} ({data['emotion']})")
     elif event_type == "conversation_completed":
-        print(f"✅ Conversation finished - {data['total_messages']} messages, {data['final_turn']} turns")
+        print(f"Conversation finished - {data['total_messages']} messages, {data['final_turn']} turns")
     elif event_type == "conversation_error":
-        print(f"❌ Error occurred: {data['error']}")
+        print(f" Error occurred: {data['error']}")
 
 def main():
     print("Running UNSCRIPTED (AI-generated) conversation...")
@@ -34,23 +34,22 @@ def main():
     sim.add_observer(conversation_observer)
     
     # Check initial state
-    print(f"📊 Initial metrics: {sim.get_metrics()}")
+    print(f"Initial metrics: {sim.get_metrics()}")
     
     # Run the conversation with observability
     sim.run(observe=True)
     
     # Check final metrics
     final_metrics = sim.get_metrics()
-    print(f"📊 Final metrics: Progress {final_metrics['progress']:.1%}, Completed: {final_metrics['completed']}")
+    print(f" Final metrics: Progress {final_metrics['progress']:.1%}, Completed: {final_metrics['completed']}")
     
     # Save outputs
     sim.save_transcript()
     sim.generate_audio()
     
-    print("\n🎉 Unscripted conversation completed!")
-    print("📁 Check outputs/unscripted/transcript.txt for the conversation")
-    print("🎵 Check outputs/unscripted/conversation.wav for the audio")
-    print("🎭 Emotions are dynamically detected based on conversation content!")
+    print("\nUnscripted conversation completed!")
+    print(" Check outputs/unscripted/transcript.txt for the conversation")
+    print(" Check outputs/unscripted/conversation.wav for the audio")
 
 if __name__ == "__main__":
     main()

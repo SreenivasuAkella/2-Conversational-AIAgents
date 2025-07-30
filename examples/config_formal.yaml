@@ -7,7 +7,7 @@ voices:
   - "voice2" # Agent B voice
 tts_provider: "gtts"
 
-# For unscripted (AI-generated) conversations
+# For unscripted (AI-generated) conversations for logic of when and why.
 agent_a_persona: "A thoughtful technology researcher who explores the societal impacts of technological advancement"
 agent_b_persona: "An insightful social scientist who analyzes how technology shapes human behavior and social structures"
 conversation_context: "A professional discussion about the relationship between technology and society, focusing on both positive and negative impacts"
