@@ -59,11 +59,12 @@ agentic_call_simulator_sdk/
 ## Installation
 
 ### 1. Create a Virtual Environment (Recommended)
+Note: This SDK requires Python 3.11. Please ensure your virtual environment is created with Python 3.11 for best compatibility.
 
 On Windows:
 ```sh
 python -m venv .venv
-.venv\Scripts\activate
+.\venv\Scripts\activate
 ```
 
 On macOS/Linux:
